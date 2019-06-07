@@ -12,20 +12,23 @@ def _bias_variable(shape):
 def _conv2d(x, W, stride):
     return tf.nn.conv2d(x, W, strides=[1, stride, stride, 1], padding='VALID')
 
+def _conv2d_norm(x, W, stride):
+    return tf.nn.conv2d(x/127.5-1, W, strides=[1, stride, stride, 1], padding='VALID')
+
 class PilotNet(object):
 
     def __init__(self):
-        self.x = tf.placeholder(tf.float32, shape=[None, 102, 364, 3]) 
+        self.input_img = tf.placeholder(tf.float32, shape=[None, 66, 200, 3]) # 102, 364
 
         # use for training loss computation
-        self.y_ = tf.placeholder(tf.float32, shape=[None, 1])
+        self.target = tf.placeholder(tf.float32, shape=[None, 1])
         self.keep_prob = tf.placeholder(tf.float32)
 
         # first convolutional layer
         W_conv1 = _weight_variable([5, 5, 3, 24])
         b_conv1 = _bias_variable([24])
 
-        self.h_conv1 = tf.nn.relu(_conv2d(self.x, W_conv1, 2) + b_conv1)
+        self.h_conv1 = tf.nn.relu(_conv2d_norm(self.input_img, W_conv1, 2) + b_conv1)
 
         # second convolutional layer
         W_conv2 = _weight_variable([5, 5, 24, 36])
@@ -52,10 +55,10 @@ class PilotNet(object):
         self.h_conv5 = tf.nn.relu(_conv2d(self.h_conv4, W_conv5, 1) + b_conv5)
 
         # FCL 1
-        W_fc1 = _weight_variable([14592, 1164])
+        W_fc1 = _weight_variable([147456 , 1164]) # 14592
         b_fc1 = _bias_variable([1164])
 
-        h_conv5_flat = tf.reshape(self.h_conv5, [-1, 14592])
+        h_conv5_flat = tf.reshape(self.h_conv5, [-1, 147456 ])  # 3514368
         h_fc1 = tf.nn.relu(tf.matmul(h_conv5_flat, W_fc1) + b_fc1)
         h_fc1_drop = tf.nn.dropout(h_fc1, self.keep_prob)
 
@@ -81,14 +84,14 @@ class PilotNet(object):
 
         h_fc4 = tf.nn.relu(tf.matmul(h_fc3_drop, W_fc4) + b_fc4)
 
-        h_fc4_drop = tf.nn.dropout(h_fc4, self.keep_prob)
+        # h_fc4_drop = tf.nn.dropout(h_fc4, self.keep_prob)
 
         # Output
         W_fc5 = _weight_variable([10, 1])
         b_fc5 = _bias_variable([1])
 
 
-        self.steering_output = tf.multiply(tf.atan(tf.matmul(h_fc4_drop, W_fc5) + b_fc5), 2)  # scale the atan output
+        self.steering_output = tf.multiply(tf.atan(tf.matmul(h_fc4, W_fc5) + b_fc5), 2)  # h_fc4_drop  # scale the atan output  
         
 
 
